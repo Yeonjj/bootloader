@@ -1,0 +1,69 @@
+     1                                  ; MyOS
+     2                                  ; TAB=4
+     3                                  
+     4                                  		ORG		0x7c00			; 이 프로그램이 어디에 read되는가
+     5                                  							; 이 주소는 메모리 
+     6                                  							; 0xeb, 0x4e, 0x90 3 bytes
+     7                                  							; http://www.datadoctor.biz/data_recovery_programming_book_chapter3-page20.html
+     8                                  
+     9                                  ; 이하는 표준적인 FAT12 포맷 플로피 디스크를 위한 기술DOS Boot Record  Format for FAT12 and FAT16
+    10                                  
+    11                                  start:
+    12 00000000 E94E00                  		JMP		entry
+    13 00000003 90                      		DB		0x90			; DB = 1byte DW = 2byte DD = 4byte 
+    14 00000004 4D794F5320202020        		DB		"MyOS    "		; OEM ID(8바이트)
+    15                                  ;BIOS Parameter Block
+    16 0000000C 0002                    		DW		512			; Bytes Per Sector(512로 해야 함)
+    17 0000000E 01                      		DB		1			; 클러스터 크기(1섹터로 해야 함)
+    18 0000000F 0100                    		DW		1			; 예약된 섹터
+    19 00000011 02                      		DB		2			; FAT 개수(2로 해야 함)
+    20                                  ;End of BIOS Parameter Block
+    21 00000012 E000                    		DW		224			; 루트 디렉토리 영역의 크기(보통 224엔트리로 해야 한다)
+    22 00000014 400B                    		DW		2880			; 드라이브 크기(2880섹터로 해야 함)
+    23 00000016 F0                      		DB		0xf0			; 미디어 타입(0xf0로 해야 함)
+    24 00000017 0900                    		DW		9			; FAT영역 길이(9섹터로 해야 함)
+    25 00000019 1200                    		DW		18			; 1트럭에 몇 개의 섹터가 있을까(18로 해야 함)
+    26 0000001B 0200                    		DW		2			; 헤드 수(2로 해야 함)
+    27 0000001D 00000000                		DD		0			; 파티션을 사용하지 않기 때문에 여기는 반드시 0
+    28 00000021 400B0000                		DD		2880			; 드라이브 크기를 한번 더 write
+    29 00000025 000029                  		DB		0,0,0x29		; Extended Boot Signature Record
+    30 00000028 FFFFFFFF                		DD		0xffffffff		; Volume Serial Number 
+    31 0000002C 4D794F532D566F6C20-     		DB		"MyOS-Vol   "		; 디스크 이름(11바이트)
+    32 00000035 2020               
+    33 00000037 4641543132202020        		DB		"FAT12   "		; 포맷 이름(8바이트)
+    34 0000003F 00<rept>                		TIMES 		18 DB 0			
+    35                                  
+    36                                  ; 프로그램 본체
+    37                                  
+    38                                  entry:
+    39 00000051 B80000                  		MOV		AX, 0			; 레지스터 초기화
+    40 00000054 8ED0                    		MOV 		SS,AX
+    41 00000056 BC007C                  		MOV 		SP,0x7c00 
+    42 00000059 8ED8                    		MOV 		DS,AX 
+    43 0000005B 8EC0                    		MOV 		ES,AX 
+    44 0000005D BE[7600]                		MOV		SI,msg
+    45                                  putloop:
+    46 00000060 8A04                    		MOV		AL,BYTE [SI]
+    47 00000062 81C60100                		ADD		SI, 1			; SI에 1을 더한다
+    48 00000066 3C00                    		CMP		AL,0
+    49 00000068 7409                    		JE		fin
+    50 0000006A B40E                    		MOV		AH, 0x0e		; 한 글자 표시 Function
+    51 0000006C BBE100                  		MOV		BX, 0xe1		; 칼라 코드
+    52 0000006F CD10                    		INT		0x10			; 비디오 BIOS 호출
+    53 00000071 EBED                    		JMP		putloop
+    54                                  fin:
+    55 00000073 F4                      		HLT					; 무엇인가 있을 때까지 CPU를 정지시킨다
+    56 00000074 EBFD                    		JMP		fin			; Endless Loop
+    57                                  
+    58                                  msg:
+    59 00000076 0A0A                    		DB		0x0a, 0x0a		; 개행을 2개
+    60 00000078 68656C6C6F2C20776F-     		DB		"hello, world"
+    61 00000081 726C64             
+    62 00000084 0A                      		DB		0x0a			; 개행
+    63 00000085 00                      		DB		0
+    64                                  
+    65 00000086 00<rept>                maker:		TIMES		0x01fe-(maker-start) DB 0	; 0x7dfe까지를 0x00로 채우는 명령 510번지 까지.
+    66                                  							; nasm 에서는 RESB와 $를함께 쓸수 없다.
+    67                                  
+    68 000001FE 55AA                    		DB		0x55, 0xaa 		; 여기까지 512byte 즉, 예약된 섹터이다
+    69                                  
